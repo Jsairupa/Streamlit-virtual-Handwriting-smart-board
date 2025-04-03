@@ -213,6 +213,8 @@ if 'current_state' not in st.session_state:
     st.session_state.current_state = "Ready"
 if 'camera_running' not in st.session_state:
     st.session_state.camera_running = False
+if 'demo_mode' not in st.session_state:
+    st.session_state.demo_mode = False
 
 # Metrics
 col1, col2, col3 = st.columns(3)
@@ -245,7 +247,6 @@ col1, col2 = st.columns(2)
 with col1:
     st.markdown('<div class="canvas-container">', unsafe_allow_html=True)
     canvas_placeholder = st.empty()
-    # Fixed: Changed use_column_width to use_container_width
     canvas_placeholder.image(st.session_state.board, channels="BGR", use_container_width=True)
     st.markdown('</div>', unsafe_allow_html=True)
 
@@ -281,7 +282,7 @@ with col2:
 
 # Camera controls
 st.markdown("### Camera Settings")
-camera_options = st.selectbox("Camera Source", ["Webcam", "Upload Video"])
+camera_options = st.selectbox("Camera Source", ["Webcam", "Upload Video", "Demo Mode"])
 
 if camera_options == "Upload Video":
     uploaded_file = st.file_uploader("Choose a video file", type=["mp4", "mov", "avi"])
@@ -292,6 +293,10 @@ if camera_options == "Upload Video":
         video_path = temp_file.name
     else:
         video_path = None
+elif camera_options == "Demo Mode":
+    st.session_state.demo_mode = True
+    video_path = None
+    st.info("Demo mode activated. This will simulate hand movements without requiring camera access.")
 else:
     video_path = 0  # Use webcam
 
@@ -299,22 +304,72 @@ else:
 def run_handwriting_app():
     # Initialize detector
     detector = HandDetector(maxHands=1, detectionCon=0.8)
-
-    # Setup video capture
+    
+    # Demo mode - create a simulated video feed
+    if st.session_state.demo_mode:
+        # Create a blank image
+        img = np.zeros((480, 640, 3), np.uint8)
+        
+        # Draw a simulated hand
+        center_x = int(320 + 100 * np.sin(time.time()))
+        center_y = int(240 + 100 * np.cos(time.time()))
+        
+        # Draw a simple hand shape
+        cv2.circle(img, (center_x, center_y), 10, (0, 255, 0), -1)  # Palm
+        cv2.line(img, (center_x, center_y), (center_x, center_y - 50), (0, 255, 0), 2)  # Index finger
+        
+        # Draw on the board
+        if time.time() % 5 < 2.5:  # Draw for 2.5 seconds, then pause
+            st.session_state.board = cv2.circle(st.session_state.board, (center_x, center_y), 5, selected_color, -1)
+            state = "Drawing (Demo)"
+        else:
+            state = "Moving (Demo)"
+        
+        # Update displays
+        camera_placeholder.image(img, channels="BGR", use_container_width=True)
+        canvas_placeholder.image(st.session_state.board, channels="BGR", use_container_width=True)
+        
+        # Update state
+        st.session_state.current_state = state
+        
+        # Sleep to control frame rate
+        time.sleep(0.05)
+        
+        return
+    
+    # Setup video capture for webcam or uploaded video
     if video_path is not None:
         try:
-            video = cv2.VideoCapture(video_path)
+            # Try multiple backends for camera access
+            backends = [cv2.CAP_ANY]
+            if hasattr(cv2, 'CAP_DSHOW'):
+                backends.append(cv2.CAP_DSHOW)
+            if hasattr(cv2, 'CAP_AVFOUNDATION'):
+                backends.append(cv2.CAP_AVFOUNDATION)
+            if hasattr(cv2, 'CAP_V4L2'):
+                backends.append(cv2.CAP_V4L2)
             
-            # Try different backend if default fails
-            if not video.isOpened():
-                # Try different backends
-                for backend in [cv2.CAP_DSHOW, cv2.CAP_AVFOUNDATION, cv2.CAP_V4L2]:
+            video = None
+            for backend in backends:
+                try:
                     video = cv2.VideoCapture(video_path, backend)
-                    if video.isOpened():
+                    if video is not None and video.isOpened():
                         break
+                except Exception:
+                    continue
             
-            if not video.isOpened():
+            if video is None or not video.isOpened():
                 st.error("Failed to open video source. Please check your camera permissions and try again.")
+                st.info("""
+                **Camera access is not available in this environment.**
+                
+                This could be due to:
+                1. Browser restrictions
+                2. Cloud deployment limitations
+                3. Missing camera hardware
+                
+                Try using the "Demo Mode" option instead, which simulates hand movements without requiring camera access.
+                """)
                 return
                 
             video.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
@@ -388,7 +443,6 @@ def run_handwriting_app():
                 cv2.putText(img, f"FPS: {int(fps)}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
                 
                 # Update displays
-                # Fixed: Changed use_column_width to use_container_width
                 camera_placeholder.image(img, channels="BGR", use_container_width=True)
                 canvas_placeholder.image(st.session_state.board, channels="BGR", use_container_width=True)
                 
@@ -404,16 +458,19 @@ def run_handwriting_app():
                 2. Try refreshing the page
                 3. Try a different browser
                 4. If on mobile, make sure the app has camera permissions
+                5. Try using the "Demo Mode" option instead
                 """)
         except Exception as e:
             st.error(f"Error accessing camera: {e}")
             st.info("""
-            This app requires OpenCV to access your camera. There might be an issue with the OpenCV installation or camera permissions.
+            **Camera access is not available in this environment.**
             
-            **Possible solutions:**
-            1. Try running this app locally with the required dependencies installed
-            2. Check if your browser allows camera access
-            3. Try a different device
+            This could be due to:
+            1. Browser restrictions
+            2. Cloud deployment limitations
+            3. Missing camera hardware
+            
+            Try using the "Demo Mode" option instead, which simulates hand movements without requiring camera access.
             """)
 
 # Toggle camera state
@@ -486,6 +543,17 @@ with tab3:
     - Improve recognition accuracy in varying lighting conditions
     - Develop a mobile version of the application
     """)
+
+# Note about cloud deployment
+st.warning("""
+**Note about camera access in cloud environments:**
+
+Camera access may be limited when running this app in cloud environments like Streamlit Cloud. 
+For the best experience with camera functionality:
+1. Run the app locally on your machine
+2. Use the "Demo Mode" option to see a simulation of the app's functionality
+3. Upload a pre-recorded video instead of using the webcam
+""")
 
 # Footer
 st.markdown("---")
