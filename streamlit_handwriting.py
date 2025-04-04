@@ -1,5 +1,4 @@
 import streamlit as st
-import requests
 
 # Set page config
 st.set_page_config(
@@ -18,8 +17,8 @@ st.header("Project Demo")
 # Google Drive video ID
 video_id = "1Pz7DoRdkSHzocEA6BAPwuy8prdE1zp1p"
 
-# Create the embed URL for Google Drive
-embed_url = f"https://drive.google.com/file/d/1Pz7DoRdkSHzocEA6BAPwuy8prdE1zp1p/view?usp=drive_link
+# Create the embed URL for Google Drive - Fixed the missing quotation mark
+embed_url = f"https://drive.google.com/file/d/{video_id}/preview"
 
 # Embed the video using an iframe
 st.markdown(f"""
@@ -59,7 +58,7 @@ The system tracks hand movements using a webcam and converts them into digital d
 - NumPy for numerical operations
 """)
 
-# GitHub repository link (update with your actual repository)
+# GitHub repository link
 st.markdown("### Source Code")
 st.markdown("[GitHub Repository](https://github.com/Jsairupa/virtual-handwriting)")
 
