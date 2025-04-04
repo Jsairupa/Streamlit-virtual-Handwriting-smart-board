@@ -1,5 +1,5 @@
 import streamlit as st
-import os
+import requests
 
 # Set page config
 st.set_page_config(
@@ -15,18 +15,28 @@ st.markdown("Draw on a virtual canvas using hand gestures captured by your webca
 # Video demo section
 st.header("Project Demo")
 
-# Get the video filename - using the actual filename from your repository
-video_file = "6FC267BB-C393-4F3A-83A6-6962A9196B15.mov"
+# Google Drive video ID
+video_id = "1Pz7DoRdkSHzocEA6BAPwuy8prdE1zp1p"
 
-# Check if the video file exists and display it
-if os.path.exists(video_file):
-    # Open the video file
-    video_bytes = open(video_file, 'rb').read()
-    
-    # Display the video with controls
-    st.video(video_bytes)
-else:
-    st.error(f"Video file not found: {video_file}")
+# Create the embed URL for Google Drive
+embed_url = f"https://drive.google.com/file/d/1Pz7DoRdkSHzocEA6BAPwuy8prdE1zp1p/view?usp=drive_link
+
+# Embed the video using an iframe
+st.markdown(f"""
+<div style="position: relative; padding-bottom: 56.25%; height: 0; overflow: hidden; max-width: 100%; border-radius: 10px; margin-bottom: 20px;">
+  <iframe src="{embed_url}" 
+    style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;" 
+    frameborder="0" 
+    allow="autoplay; encrypted-media" 
+    allowfullscreen>
+  </iframe>
+</div>
+""", unsafe_allow_html=True)
+
+# Alternative direct video link
+st.markdown("""
+If the embedded video doesn't load, you can [watch the demo video directly on Google Drive](https://drive.google.com/file/d/1Pz7DoRdkSHzocEA6BAPwuy8prdE1zp1p/view?usp=sharing).
+""")
 
 # Project description
 st.header("Project Overview")
