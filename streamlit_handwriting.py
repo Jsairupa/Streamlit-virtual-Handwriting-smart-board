@@ -19,36 +19,26 @@ st.markdown("Draw on a virtual canvas using hand gestures captured by your webca
 # Initialize session state variables
 if 'img_canvas' not in st.session_state:
     st.session_state.img_canvas = np.zeros((480, 640, 3), np.uint8)
-if 'demo_running' not in st.session_state:
-    st.session_state.demo_running = False
-if 'demo_speed' not in st.session_state:
-    st.session_state.demo_speed = 1.0
 if 'drawing_color' not in st.session_state:
     st.session_state.drawing_color = (255, 255, 255)
 if 'brush_size' not in st.session_state:
     st.session_state.brush_size = 5
 if 'demo_mode' not in st.session_state:
     st.session_state.demo_mode = 0  # 0: Draw, 1: Erase, 2: Clear
-if 'demo_time' not in st.session_state:
-    st.session_state.demo_time = time.time()
-if 'hand_position' not in st.session_state:
-    st.session_state.hand_position = (320, 240)
 if 'prev_position' not in st.session_state:
     st.session_state.prev_position = None
+if 'last_update' not in st.session_state:
+    st.session_state.last_update = time.time()
 
 # Sidebar for controls
 with st.sidebar:
     st.header("Demo Controls")
     
-    # Start/Stop demo
-    if st.button("Start Demo" if not st.session_state.demo_running else "Stop Demo"):
-        st.session_state.demo_running = not st.session_state.demo_running
-        st.session_state.demo_time = time.time()
-        if st.session_state.demo_running:
-            st.session_state.img_canvas = np.zeros((480, 640, 3), np.uint8)
+    # Auto-run demo
+    auto_run = st.checkbox("Auto-run Demo", value=True)
     
     # Demo speed
-    st.session_state.demo_speed = st.slider("Demo Speed", 0.5, 2.0, 1.0, 0.1)
+    demo_speed = st.slider("Demo Speed", 0.5, 2.0, 1.0, 0.1)
     
     # Color picker
     color_options = {
@@ -102,12 +92,16 @@ with col2:
         )
 
 # Function to update the demo animation
-def update_demo():
+def update_demo(current_time, auto_run):
     # Create a blank frame for the camera view
     camera_frame = np.zeros((480, 640, 3), np.uint8)
     
-    # Current time adjusted by speed
-    current_time = (time.time() - st.session_state.demo_time) * st.session_state.demo_speed
+    if not auto_run:
+        cv2.putText(camera_frame, "DEMO PAUSED", (220, 240), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
+        cv2.putText(camera_frame, "Enable 'Auto-run Demo' to begin", (160, 280), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 1)
+        camera_placeholder.image(camera_frame, channels="BGR", use_container_width=True)
+        canvas_placeholder.image(st.session_state.img_canvas, channels="BGR", use_container_width=True)
+        return
     
     # Determine demo mode based on time
     mode_duration = 5  # seconds per mode
@@ -136,10 +130,9 @@ def update_demo():
     cv2.putText(camera_frame, mode_text, (20, 40), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
     
     # Simulate hand movement
-    t = current_time * 0.5
+    t = current_time * 0.5 * demo_speed
     x = int(320 + 200 * np.sin(t))
     y = int(240 + 150 * np.cos(t * 1.3))
-    st.session_state.hand_position = (x, y)
     
     # Draw simulated hand
     if st.session_state.demo_mode == 0:
@@ -202,8 +195,8 @@ def update_demo():
     cv2.putText(camera_frame, "Hand Tracking Active", (20, 460), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 1)
     
     # Display frames
-    camera_placeholder.image(camera_frame, channels="BGR", use_column_width=True)
-    canvas_placeholder.image(st.session_state.img_canvas, channels="BGR", use_column_width=True)
+    camera_placeholder.image(camera_frame, channels="BGR", use_container_width=True)
+    canvas_placeholder.image(st.session_state.img_canvas, channels="BGR", use_container_width=True)
 
 # Project description
 st.markdown("---")
@@ -230,15 +223,10 @@ The system tracks hand movements using a webcam and converts them into digital d
 st.markdown("### Source Code")
 st.markdown("[GitHub Repository](https://github.com/Jsairupa/virtual-handwriting)")
 
-# Run the demo update in a loop if demo is running
-if st.session_state.demo_running:
-    update_demo()
-    st.experimental_rerun()
-else:
-    # Show static frames when demo is not running
-    camera_frame = np.zeros((480, 640, 3), np.uint8)
-    cv2.putText(camera_frame, "DEMO PAUSED", (220, 240), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
-    cv2.putText(camera_frame, "Click 'Start Demo' to begin", (160, 280), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 1)
-    
-    camera_placeholder.image(camera_frame, channels="BGR", use_column_width=True)
-    canvas_placeholder.image(st.session_state.img_canvas, channels="BGR", use_column_width=True)
+# Run the demo update without using experimental_rerun
+current_time = time.time() - st.session_state.last_update
+update_demo(current_time, auto_run)
+
+# Add a refresh button to manually update the demo
+if st.button("Refresh Demo"):
+    st.session_state.last_update = time.time()
